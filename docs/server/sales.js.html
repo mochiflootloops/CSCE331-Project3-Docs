@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: sales.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: sales.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * This file contains functions to generate and calculate report data for the Manager's Sales, Restock, and Excess Reports.
+ * @author Krishnan Prashanth
+ * @author Mohona Ghosh
+ * @author Estella Chen
+ */
+const express = require("express");
+const app = express.Router();
+const db = require("../db");
+
+// ------------------------------------ Sales ------------------------------------
+/**
+ * Retrieves sales data over a given time period and calculates the amount of each menu item sold during that time period. Returns
+ * data in JSON format for easy conversion on the frontend.
+ * @param {*} req the request parameters of start and end dates
+ * @param {*} res the response status and sales data
+ */
+app.get("/getSalesReport/:timeStart/:timeEnd", async (req, res) => {
+  
+  const getFreq = (map, array) => {
+    array.forEach(item => {
+      if(map[item]) map[item]++;
+      else map[item] = 1;
+    })
+    return map;
+  }
+  
+  try {
+    console.log("BEGIN API CALL")
+    const timeStart = req.params.timeStart;
+    const timeEnd = req.params.timeEnd;
+    console.log("timeStart", timeStart, "timeEnd", timeEnd)
+
+    const report = await db.query("SELECT * FROM orders WHERE saledate >= $1 AND saledate &lt;= $2", [timeStart, timeEnd]);
+    const freq = new Map();
+    for(let i = 0; i &lt; report.rowCount; ++i)
+    {
+      const orderItems = report.rows[i].itemsordered;
+      getFreq(freq, orderItems);
+    }
+    
+    console.log(freq);
+    
+    res.status(200).json({
+      status: "success",
+      results: freq.length,
+      data: {
+        table: freq,
+      },
+    });
+  } catch (err) {
+    console.error(err.message);
+
+  }
+});
+
+
+
+// ------------------------------------ Restock ------------------------------------
+/**
+ * Retrieves data on which items need to be restocked based on a threshold critical stock amount. Returns the item name 
+ * and quantity remaining in stock, displayed in JSON format for table display. 
+ * @param {*} req the request parameters
+ * @param {*} res the response body, containing the call status and the restock data
+ */
+app.get("/getRestockReport", async (req, res) => {
+  const threshold = 105;
+  try {
+    const report = await db.query("SELECT * FROM inventory WHERE quantity &lt; $1", [threshold]);
+    console.log(report.rows);
+    const returnVal = new Map();
+    for(let i = 0; i &lt; report.rowCount; ++i)
+    {
+      const ingredientName = report.rows[i].name;
+      const remainingQty = report.rows[i].quantity + " " + report.rows[i].unit;
+      returnVal[ingredientName] = remainingQty;
+    }
+    res.status(200).json({
+      status: "success",
+      results: returnVal.length,
+      data: {
+        table: returnVal,
+      },
+    });  } catch (err) {
+    console.log(err);
+  }
+});
+
+// ------------------------------------ Excess ------------------------------------
+/**
+ * Retrieves data on inventory items that are stocked in excess based on a given timeframe
+ * @param {*} req the request parameters detailing the time period for which to generate the restock report
+ * @param {*} res the response body containing the API call status and excess report in JSON format.
+ */
+app.get("/getExcessReport/:timeStart", async (req, res) => {
+
+    try {
+      const timeStart = req.params.timeStart;
+    //   const timeEnd = req.params.timeEnd;
+    //   console.log("timeStart", timeStart, "timeEnd", timeEnd)
+      const extraItems = new Array();
+      const report = await db.query("SELECT * FROM inventory;", [timeStart]);
+      for(let i = 0; i &lt; report.rowCount; ++i)
+      {
+        // const orderItems = report.rows[i].itemsordered;
+        // getFreq(freq, orderItems);
+        // const qty = report.rows[i].quantity;
+        if(qty >= 90)
+            extraItems.push([report.rows[i].name, report.rows[i].quantity]);
+
+      }
+      
+      console.log(extraItems);
+      
+      res.status(200).json({
+        status: "success",
+        results: extraItems.length,
+        data: {
+          table: extraItems,
+        },
+      });
+    } catch (err) {
+      console.error(err.message);
+      res.status(404);
+  
+    }
+  });
+
+
+module.exports = app;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#express">express</a></li><li><a href="global.html#router">router</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.0</a> on Tue Dec 06 2022 23:09:55 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
